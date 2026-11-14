@@ -145,17 +145,62 @@ window.addEventListener("load", () => {
   requestAnimationFrame(step);
 });
 
+// one leader line + dot per callout, kept in an SVG over the canvas
+const SVGNS = "http://www.w3.org/2000/svg";
+const lineSvg = $<SVGSVGElement>("[data-callout-lines]")!;
+const leaders = callouts.map(() => {
+  const g = document.createElementNS(SVGNS, "g");
+  const line = document.createElementNS(SVGNS, "line");
+  const halo = document.createElementNS(SVGNS, "circle");
+  const dot = document.createElementNS(SVGNS, "circle");
+  const num = document.createElementNS(SVGNS, "text");
+  halo.setAttribute("class", "halo");
+  halo.setAttribute("r", "8");
+  dot.setAttribute("r", "4");
+  num.setAttribute("class", "num");
+  num.textContent = String(callouts.length ? lineSvg.childElementCount + 1 : 1);
+  g.append(line, halo, dot, num);
+  g.style.opacity = "0";
+  lineSvg.append(g);
+  return { g, line, halo, dot, num };
+});
+
 function placeCallouts() {
-  for (const c of callouts) {
-    const x = fit.x + Number(c.dataset.x) * fit.scale;
-    const y = fit.y + Number(c.dataset.y) * fit.scale;
+  const cw = canvas.clientWidth;
+  const ch = canvas.clientHeight;
+  const edge = 16;
+  const compact = isMobile(); // phones: numbered dots on the parts + a numbered list above, no leader lines
+  hero.classList.toggle("callouts-compact", compact);
+  callouts.forEach((c, i) => {
+    // dot on the part
+    const ax = fit.x + Number(c.dataset.x) * fit.scale;
+    const ay = fit.y + Number(c.dataset.y) * fit.scale;
+    const { line, halo, dot, num } = leaders[i];
+    for (const el of [halo, dot]) { el.setAttribute("cx", String(ax)); el.setAttribute("cy", String(ay)); }
+    num.setAttribute("x", String(ax));
+    num.setAttribute("y", String(ay));
+    if (compact) {
+      c.style.left = c.style.top = c.style.transform = c.style.marginLeft = "";
+      return;
+    }
+    // label sits in clear space; "right" = the box grows to the right of its attach point
     const right = c.dataset.side === "right";
-    const gap = 18; // the dot (::before) sits about 18px outside the chip, right on the part
-    c.style.left = `${x}px`;
-    c.style.top = `${y}px`;
+    const w = c.offsetWidth;
+    const h = c.offsetHeight;
+    let lx = fit.x + Number(c.dataset.lx) * fit.scale;
+    const ly = Math.min(ch - h / 2 - edge, Math.max(h / 2 + edge + 64, fit.y + Number(c.dataset.ly) * fit.scale));
+    // keep the whole box on screen
+    if (right) lx = Math.min(Math.max(lx, edge), cw - w - edge);
+    else lx = Math.max(Math.min(lx, cw - edge), w + edge);
+    c.style.left = `${lx}px`;
+    c.style.top = `${ly}px`;
+    c.style.marginLeft = "0";
     c.style.transform = right ? "translate(0, -50%)" : "translate(-100%, -50%)";
-    c.style.marginLeft = right ? `${gap}px` : `-${gap}px`;
-  }
+    line.setAttribute("x1", String(ax));
+    line.setAttribute("y1", String(ay));
+    line.setAttribute("x2", String(lx));
+    line.setAttribute("y2", String(ly));
+  });
 }
 
 computeFit();
@@ -170,6 +215,7 @@ if (reduceMotion) {
   hero.style.setProperty("--floor-fade", "0");
   layout();
   placeCallouts();
+  leaders.forEach((l) => (l.g.style.opacity = "1"));
   loadFrame(current);
   word.style.opacity = "0";
   if (hint) hint.style.display = "none";
@@ -207,6 +253,7 @@ if (reduceMotion) {
         const v = gsap.utils.clamp(0, 1, (p - start) / 0.04);
         c.style.opacity = String(v);
         c.style.filter = `blur(${(1 - v) * 6}px)`;
+        leaders[i].g.style.opacity = String(v);
       });
     },
   });

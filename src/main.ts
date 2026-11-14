@@ -125,7 +125,7 @@ function loadFrame(i: number) {
   if (frames[i]) return frames[i]!;
   const img = new Image();
   img.decoding = "async";
-  img.src = `/frames/${folder}/f_${String(i).padStart(3, "0")}.webp`;
+  img.src = `${import.meta.env.BASE_URL}frames/${folder}/f_${String(i).padStart(3, "0")}.webp`;
   img.onload = () => { if (i === current || drawn !== current) draw(current); };
   frames[i] = img;
   return img;
